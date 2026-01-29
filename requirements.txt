@@ -3,4 +3,6 @@ uvicorn
 sqlalchemy
 psycopg[binary]
 python-dotenv
+psycopg2-binary
+
 

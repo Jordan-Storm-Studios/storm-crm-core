@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -19,16 +20,30 @@ def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
         """)
     ).first()
 
-    if rowset:
+       if rowset:
         rowset_id = rowset.rowset_id
     else:
+        run_id = str(uuid.uuid4())
+
         rowset_id = db.execute(
             text("""
-                INSERT INTO crm_rowsets (schema_version, stage)
-                VALUES ('CRMRow.v1', 'manual')
+                INSERT INTO crm_rowsets (
+                    run_id,
+                    stage,
+                    schema_version,
+                    row_count
+                )
+                VALUES (
+                    :run_id,
+                    'manual',
+                    'CRMRow.v1',
+                    0
+                )
                 RETURNING rowset_id
-            """)
+            """),
+            {"run_id": run_id}
         ).scalar()
+
 
     # 2️⃣ Insert the contact as a CRM row
     db.execute(

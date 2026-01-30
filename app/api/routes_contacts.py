@@ -168,26 +168,22 @@ def list_contacts(db: Session = Depends(get_db)):
 # ===============================
 @router.get("/contacts/{row_id}")
 def get_contact(row_id: str, db: Session = Depends(get_db)):
-    # 1️⃣ We cast :row_id to UUID explicitly to ensure Postgres matches the type
-    # 2️⃣ We fetch row_id as well to confirm identity
     result = db.execute(
         text("""
             SELECT row_id, raw_json
             FROM crm_rows
-            WHERE row_id = :row_id::uuid
+            WHERE row_id = CAST(:row_id AS UUID)
             LIMIT 1
         """),
         {"row_id": row_id}
     ).fetchone()
 
-    # 3️⃣ 404 Handling
     if result is None:
         raise HTTPException(
             status_code=404, 
             detail=f"Contact with ID {row_id} not found in crm_rows"
         )
 
-    # 4️⃣ Parse and return
     contact_data = result.raw_json
     if isinstance(contact_data, str):
         contact_data = json.loads(contact_data)

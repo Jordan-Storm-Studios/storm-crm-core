@@ -1,44 +1,37 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.db.models.contact import Contact
+from app.schemas.contact import ContactCreate, ContactRead
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 
-@router.post("/")
-def create_contact(payload: dict, db: Session = Depends(get_db)):
-    """
-    Minimal v1 contact creation.
-    Expects a JSON body like:
-    {
-      "email": "test@example.com",
-      "first_name": "Jane",
-      "last_name": "Doe",
-      "job_title": "Head of Growth"
-    }
-    """
+@router.post("", response_model=ContactRead)
+def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
+    existing = (
+        db.query(Contact)
+        .filter(Contact.email == payload.email)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Contact already exists")
 
-    # NOTE:
-    # For now, we just store the raw payload.
-    # We will map this properly to crm_rows + fields next.
-    # This endpoint is just to prove wiring works.
+    contact = Contact(
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=payload.email,
+    )
 
-    return {
-        "status": "ok",
-        "received": payload
-    }
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+
+    return contact
 
 
-@router.get("/{row_id}")
-def get_contact(row_id: str, db: Session = Depends(get_db)):
-    """
-    Fetch a contact by CRM row_id.
-    (Stub for now)
-    """
-
-    return {
-        "row_id": row_id,
-        "status": "stub"
-    }
+@router.get("", response_model=list[ContactRead])
+def list_contacts(db: Session = Depends(get_db)):
+    return db.query(Contact).limit(50).all()
 

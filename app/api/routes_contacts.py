@@ -10,6 +10,9 @@ from app.schemas.contact import ContactCreate
 router = APIRouter()
 
 
+# ===============================
+# POST /contacts
+# ===============================
 @router.post("/contacts")
 def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
     payload = {
@@ -71,7 +74,7 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
             }
         )
 
-        # 3️⃣ Rowset
+        # 3️⃣ CRM rowset
         rowset_id = db.execute(
             text("""
                 INSERT INTO crm_rowsets (
@@ -134,29 +137,39 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ===============================
+# GET /contacts
+# ===============================
 @router.get("/contacts")
 def list_contacts(db: Session = Depends(get_db)):
-    try:
-        rows = db.execute(
-            text("""
-                SELECT raw_json
-                FROM crm_rows
-                ORDER BY created_at DESC
-                LIMIT 100
-            """)
-        ).fetchall()
+    rows = db.execute(
+        text("""
+            SELECT raw_json
+            FROM crm_rows
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+    ).fetchall()
 
-        contacts = []
-        for row in rows:
-            value = row.raw_json
+    return [json.loads(row.raw_json) for row in rows]
 
-            # ✅ FIX: raw_json may already be a dict
-            if isinstance(value, dict):
-                contacts.append(value)
-            elif isinstance(value, str):
-                contacts.append(json.loads(value))
 
-        return contacts
+# ===============================
+# GET /contacts/{row_id}
+# ===============================
+@router.get("/contacts/{row_id}")
+def get_contact(row_id: str, db: Session = Depends(get_db)):
+    row = db.execute(
+        text("""
+            SELECT raw_json
+            FROM crm_rows
+            WHERE row_id = :row_id
+            LIMIT 1
+        """),
+        {"row_id": row_id}
+    ).fetchone()
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    return json.loads(row.raw_json)

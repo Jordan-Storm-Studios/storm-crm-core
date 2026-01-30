@@ -9,4 +9,3 @@ app.include_router(contacts_router)
 def health():
     return {"status": "ok"}
 
-

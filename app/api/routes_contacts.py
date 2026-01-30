@@ -148,8 +148,13 @@ def list_contacts(db: Session = Depends(get_db)):
 
         contacts = []
         for row in rows:
-            if row.raw_json:
-                contacts.append(json.loads(row.raw_json))
+            value = row.raw_json
+
+            # ✅ FIX: raw_json may already be a dict
+            if isinstance(value, dict):
+                contacts.append(value)
+            elif isinstance(value, str):
+                contacts.append(json.loads(value))
 
         return contacts
 

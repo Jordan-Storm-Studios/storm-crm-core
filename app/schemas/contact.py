@@ -1,16 +1,10 @@
 from pydantic import BaseModel, EmailStr
-from uuid import UUID
+from typing import Optional
 
 class ContactCreate(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
     email: EmailStr
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    company_name: Optional[str] = None
 
-class ContactRead(ContactCreate):
-    id: UUID
-    status: str
-    suppressed: bool
-
-    class Config:
-        from_attributes = True
 

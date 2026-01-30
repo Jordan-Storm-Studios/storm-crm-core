@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from typing import List, Optional
+from pydantic import BaseModel
 import uuid
 import json
 
@@ -9,7 +11,12 @@ from app.schemas.contact import ContactCreate
 
 router = APIRouter()
 
-
+class ContactResponse(BaseModel):
+    row_id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    
 # ===============================
 # POST /contacts
 # ===============================
@@ -140,7 +147,7 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
 # ===============================
 # GET /contacts
 # ===============================
-@router.get("/contacts")
+@router.get("/contacts", response_model=List[ContactResponse])
 def list_contacts(
     db: Session = Depends(get_db),
     limit: int = Query(50, ge=1, le=100),
@@ -151,26 +158,29 @@ def list_contacts(
             SELECT row_id, raw_json
             FROM crm_rows
             ORDER BY created_at DESC
-            LIMIT 100
+            LIMIT :limit OFFSET :offset
         """),
         {"limit": limit, "offset": offset}
     ).fetchall()
 
     results = []
     for row in rows:
-        contact_data = row.raw_json
-        if isinstance(contact_data, str):
-            contact_data = json.loads(contact_data)
-
-        results.append({
-            "row_id": str(row.row_id),
-            "email": contact_data.get("email"),
-            "first_name": contact_data.get("first_name"),
-            "last_name": contact_data.get("last_name")
-        })
+        try:
+            contact_data = row.raw_json
+            
+            if isinstance(contact_data, str):
+                contact_data = json.loads(contact_data)
+                
+                results.append({
+                    "row_id": str(row.row_id),
+                    "email": contact_data.get("email", "unknown@missing.com"),
+                    "first_name": contact_data.get("first_name"),
+                    "last_name": contact_data.get("last_name")
+                })
+        except Exception as e:
+            continue
             
     return results
-
 
 # ===============================
 # GET /contacts/{row_id}

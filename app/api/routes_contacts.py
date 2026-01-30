@@ -28,24 +28,32 @@ def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
     else:
         run_id = str(uuid.uuid4())
 
-        rowset_id = db.execute(
-            text("""
-                INSERT INTO crm_rowsets (
-                    run_id,
-                    stage,
-                    schema_version,
-                    row_count
-                )
-                VALUES (
-                    :run_id,
-                    'manual',
-                    'CRMRow.v1',
-                    0
-                )
-                RETURNING rowset_id
-            """),
-            {"run_id": run_id}
-        ).scalar()
+       artifact_id = str(uuid.uuid4())
+
+rowset_id = db.execute(
+    text("""
+        INSERT INTO crm_rowsets (
+            run_id,
+            artifact_id,
+            stage,
+            schema_version,
+            row_count
+        )
+        VALUES (
+            :run_id,
+            :artifact_id,
+            'manual',
+            'CRMRow.v1',
+            0
+        )
+        RETURNING rowset_id
+    """),
+    {
+        "run_id": run_id,
+        "artifact_id": artifact_id
+    }
+).scalar()
+
 
     # 3️⃣ Insert the actual contact row
     db.execute(

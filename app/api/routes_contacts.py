@@ -12,18 +12,18 @@ router = APIRouter()
 
 @router.post("/contacts")
 def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
+    # Contact payload stored as raw JSON
     payload = {
         "email": contact.email,
         "first_name": contact.first_name,
         "last_name": contact.last_name,
     }
 
-    # 1️⃣ Create a run_id (required by schema)
+    # Required IDs
     run_id = str(uuid.uuid4())
-
-    # 2️⃣ Create a rowset (required parent)
     artifact_id = str(uuid.uuid4())
 
+    # 1️⃣ Create rowset (parent container)
     rowset_id = db.execute(
         text("""
             INSERT INTO crm_rowsets (
@@ -31,6 +31,7 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
                 artifact_id,
                 stage,
                 schema_version,
+                storage_uri,
                 row_count
             )
             VALUES (
@@ -38,17 +39,18 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
                 :artifact_id,
                 'manual',
                 'CRMRow.v1',
+                'inline',
                 0
             )
             RETURNING rowset_id
         """),
         {
             "run_id": run_id,
-            "artifact_id": artifact_id
+            "artifact_id": artifact_id,
         }
     ).scalar()
 
-    # 3️⃣ Insert the actual row (the contact)
+    # 2️⃣ Insert contact row
     row_id = db.execute(
         text("""
             INSERT INTO crm_rows (
@@ -67,11 +69,11 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
         """),
         {
             "rowset_id": rowset_id,
-            "raw_json": json.dumps(payload)
+            "raw_json": json.dumps(payload),
         }
     ).scalar()
 
-    # 4️⃣ Update row_count
+    # 3️⃣ Update row count
     db.execute(
         text("""
             UPDATE crm_rowsets
@@ -86,5 +88,6 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
     return {
         "status": "ok",
         "row_id": str(row_id),
-        "rowset_id": str(rowset_id)
+        "rowset_id": str(rowset_id),
     }
+

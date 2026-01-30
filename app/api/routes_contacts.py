@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
@@ -141,25 +141,34 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
 # GET /contacts
 # ===============================
 @router.get("/contacts")
-def list_contacts(db: Session = Depends(get_db)):
+def list_contacts(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
     rows = db.execute(
         text("""
             SELECT row_id, raw_json
             FROM crm_rows
             ORDER BY created_at DESC
             LIMIT 100
-        """)
+        """),
+        {"limit": limit, "offset": offset}
     ).fetchall()
 
     results = []
     for row in rows:
-        data = row.raw_json
-        if isinstance(data, str):
-            data = json.loads(data)
+        contact_data = row.raw_json
+        if isinstance(contact_data, str):
+            contact_data = json.loads(contact_data)
 
-        data["row_id"] = str(row.row_id)
-        results.append(data)
-
+        results.append({
+            "row_id": str(row.row_id),
+            "email": contact_data.get("email"),
+            "first_name": contact_data.get("first_name"),
+            "last_name": contact_data.get("last_name")
+        })
+            
     return results
 
 

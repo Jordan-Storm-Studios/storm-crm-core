@@ -144,14 +144,23 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
 def list_contacts(db: Session = Depends(get_db)):
     rows = db.execute(
         text("""
-            SELECT raw_json
+            SELECT row_id, raw_json
             FROM crm_rows
             ORDER BY created_at DESC
             LIMIT 100
         """)
     ).fetchall()
 
-    return [json.loads(row.raw_json) for row in rows]
+    results = []
+    for row in rows:
+        data = row.raw_json
+        if isinstance(data, str):
+            data = json.loads(data)
+
+        data["row_id"] = str(row.row_id)
+        results.append(data)
+
+    return results
 
 
 # ===============================
@@ -179,7 +188,9 @@ def get_contact(row_id: str, db: Session = Depends(get_db)):
         )
 
     # 4️⃣ Parse and return
-    contact_data = json.loads(result.raw_json)
+    contact_data = result.raw_json
+    if isinstance(contact_data, str):
+        contact_data = json.loads(contact_data)
     
     # Optional: include the DB id in the response for debugging
     contact_data["row_id"] = str(result.row_id)

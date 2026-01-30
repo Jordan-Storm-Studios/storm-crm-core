@@ -1,37 +1,53 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-
 from app.db.session import get_db
-from app.db.models.contact import Contact
-from app.schemas.contact import ContactCreate, ContactRead
+from app.schemas.contact import ContactCreate
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
-
-@router.post("", response_model=ContactRead)
+@router.post("")
 def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
-    existing = (
-        db.query(Contact)
-        .filter(Contact.email == payload.email)
-        .first()
-    )
-    if existing:
-        raise HTTPException(status_code=400, detail="Contact already exists")
+    # 1. Create a crm_row
+    row = db.execute(
+        text("""
+            INSERT INTO crm_rows (schema_version)
+            VALUES ('CRMRow.v1')
+            RETURNING id
+        """)
+    ).first()
 
-    contact = Contact(
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        email=payload.email,
-    )
+    row_id = row.id
 
-    db.add(contact)
+    # 2. Get column ids
+    columns = db.execute(
+        text("""
+            SELECT id, column_key
+            FROM crm_columns
+            WHERE schema_version = 'CRMRow.v1'
+              AND column_key IN ('email', 'first_name', 'last_name')
+        """)
+    ).all()
+
+    column_map = {c.column_key: c.id for c in columns}
+
+    # 3. Insert field values
+    for key, value in payload.dict().items():
+        if value is None:
+            continue
+
+        db.execute(
+            text("""
+                INSERT INTO crm_field_values (row_id, column_id, value)
+                VALUES (:row_id, :column_id, :value)
+            """),
+            {
+                "row_id": row_id,
+                "column_id": column_map[key],
+                "value": value
+            }
+        )
+
     db.commit()
-    db.refresh(contact)
 
-    return contact
-
-
-@router.get("", response_model=list[ContactRead])
-def list_contacts(db: Session = Depends(get_db)):
-    return db.query(Contact).limit(50).all()
-
+    return {"id": row_id, "status": "created"}

@@ -1,26 +1,29 @@
-import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import uuid
+
 from app.db.session import get_db
 from app.schemas.contact import ContactCreate
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
+
 @router.post("")
 def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
-    # 1️⃣ Ensure a rowset exists (reuse latest one)
+    # 1️⃣ Look for an existing manual rowset
     rowset = db.execute(
         text("""
             SELECT rowset_id
             FROM crm_rowsets
-            WHERE schema_version = 'CRMRow.v1'
-            ORDER BY rowset_id DESC
+            WHERE stage = 'manual'
+            ORDER BY created_at DESC
             LIMIT 1
         """)
     ).first()
 
-       if rowset:
+    # 2️⃣ Create one if it doesn't exist
+    if rowset:
         rowset_id = rowset.rowset_id
     else:
         run_id = str(uuid.uuid4())
@@ -44,8 +47,7 @@ def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
             {"run_id": run_id}
         ).scalar()
 
-
-    # 2️⃣ Insert the contact as a CRM row
+    # 3️⃣ Insert the actual contact row
     db.execute(
         text("""
             INSERT INTO crm_rows (

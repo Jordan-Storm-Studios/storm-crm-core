@@ -12,7 +12,6 @@ router = APIRouter()
 
 @router.post("/contacts")
 def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
-    # Build payload
     payload = {
         "email": contact.email,
         "first_name": contact.first_name,
@@ -22,7 +21,7 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
     run_id = str(uuid.uuid4())
     artifact_id = str(uuid.uuid4())
 
-    # 1️⃣ Create rowset (must satisfy ALL constraints)
+    # 1️⃣ Create rowset (must satisfy CHECK + NOT NULL constraints)
     rowset_id = db.execute(
         text("""
             INSERT INTO crm_rowsets (
@@ -36,7 +35,7 @@ def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
             VALUES (
                 :run_id,
                 :artifact_id,
-                'ingest',
+                'raw',
                 'CRMRow.v1',
                 'inline',
                 0
